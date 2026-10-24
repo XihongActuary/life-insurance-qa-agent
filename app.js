@@ -155,8 +155,12 @@
   function loadCfg() {
     try {
       var raw = localStorage.getItem(LS_KEY);
-      return raw ? JSON.parse(raw) : { base: "", key: "", model: "" };
-    } catch (e) { return { base: "", key: "", model: "" }; }
+      var d = raw ? JSON.parse(raw) : {};
+      return {
+        base: d.base || "", key: d.key || "", model: d.model || "",
+        noStream: !!d.noStream
+      };
+    } catch (e) { return { base: "", key: "", model: "", noStream: false }; }
   }
   function saveCfg(cfg) {
     try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch (e) {}
@@ -343,10 +347,19 @@
     var acc = "";
     function paint() { answerBody.innerHTML = md(acc) + '<span class="cursor"></span>'; }
 
-    streamChat(buildMessages(question, useHits), function (d) { acc += d; paint(); })
-      .then(function (full) {
-        if (!full) return plainChat(buildMessages(question, useHits)).then(function (t) { return t; });
-        return full;
+    var msgs = buildMessages(question, useHits);
+    var first = cfg.noStream
+      ? plainChat(msgs).then(function (t) { acc = t || ""; return acc; })
+      : streamChat(msgs, function (d) { acc += d; paint(); })
+          .then(function (full) {
+            if (!full) return plainChat(msgs).then(function (t) { return t; });
+            return full;
+          });
+
+    first
+      .then(function (text) {
+        acc = text || acc;
+        return acc;
       })
       .then(function (text) {
         acc = text || acc;
@@ -355,14 +368,29 @@
       .catch(function (err) {
         var msg = String(err && err.message || err);
         var tip;
-        if (/Failed to fetch|NetworkError|TypeError/i.test(msg)) {
-          tip = "调用失败：浏览器直连被拦截（多为服务商 CORS 限制或网络不通）。可换用支持浏览器直连的服务商（如硅基流动、智谱），或检查接口地址是否完整。";
-        } else if (/HTTP 401|HTTP 403/.test(msg)) {
-          tip = "调用失败：API Key 无效或没有权限（" + msg.slice(0, 60) + "）。请点右上角「模型设置」检查。";
+        if (/Failed to fetch|NetworkError|TypeError|Network request failed/i.test(msg)) {
+          tip = "调用失败：请求没能送到服务商（" + msg.slice(0, 50) + "）。\n\n" +
+                "已实测 DeepSeek / 硅基流动 / 智谱 / Moonshot / 通义五家的跨域头都正常，**基本可以排除跨域限制**。常见原因是：\n" +
+                "1. 公司或家庭网络屏蔽了该 API 域名（可换手机热点一试）\n" +
+                "2. 广告拦截 / 隐私保护类浏览器扩展拦掉了请求（可换无痕窗口一试）\n" +
+                "3. 接口地址填错（漏了 https:// 前缀、或漏了 /v1）\n" +
+                "4. 在 IDE 预览面板或本地 file:// 下打开 —— 请改用系统浏览器访问线上地址\n\n" +
+                "点右上角「⚙ 模型设置 → 测试连接」可以逐层定位到底卡在哪一步。\n\n" +
+                "不想折腾也能用：下面直接给你知识库原文。";
+        } else if (/HTTP 401/.test(msg)) {
+          tip = "调用失败：API Key 无效或已过期。请点右上角「模型设置」重新粘贴一个 Key。\n\n下面先用知识库原文作答。";
+        } else if (/HTTP 402/.test(msg)) {
+          tip = "调用失败：账户余额不足（HTTP 402）。去服务商后台充值后即可恢复 —— DeepSeek 新注册账号最常见这个。\n\n下面先用知识库原文作答。";
+        } else if (/HTTP 403/.test(msg)) {
+          tip = "调用失败：密钥没有该模型的调用权限（HTTP 403）。换一个模型名或换一个 Key。\n\n下面先用知识库原文作答。";
+        } else if (/HTTP 404/.test(msg)) {
+          tip = "调用失败：接口地址或模型名不对（HTTP 404）。地址要以 /v1 结尾，模型名请照抄服务商控制台里的名字。\n\n下面先用知识库原文作答。";
+        } else if (/HTTP 429/.test(msg)) {
+          tip = "调用失败：触发限流（HTTP 429）。稍等一会儿再试。\n\n下面先用知识库原文作答。";
         } else if (/HTTP 4\d\d/.test(msg)) {
-          tip = "调用失败：" + msg.slice(0, 160) + "。请检查接口地址与模型名称是否匹配。";
+          tip = "调用失败：" + msg.slice(0, 160) + "。请检查接口地址与模型名称是否匹配。\n\n下面先用知识库原文作答。";
         } else {
-          tip = "调用失败：" + msg.slice(0, 160);
+          tip = "调用失败：" + msg.slice(0, 160) + "\n\n下面先用知识库原文作答。";
         }
         answerBody.innerHTML = md(tip) +
           '<details class="src-item" open style="margin-top:12px"><summary>查看知识库原文命中结果</summary>' +
@@ -474,6 +502,8 @@
     $("cfgBase").value = cfg.base || "";
     $("cfgKey").value = cfg.key || "";
     $("cfgModel").value = cfg.model || "";
+    $("cfgNoStream").checked = !!cfg.noStream;
+    $("diagBox").style.display = "none";
     mask.classList.add("show");
   }
   function closeSettings() { mask.classList.remove("show"); }
@@ -486,15 +516,105 @@
     cfg = {
       base: $("cfgBase").value.trim(),
       key: $("cfgKey").value.trim(),
-      model: $("cfgModel").value.trim()
+      model: $("cfgModel").value.trim(),
+      noStream: $("cfgNoStream").checked
     };
     saveCfg(cfg);
     setMode();
     closeSettings();
   });
 
+  /* ---- 连接诊断：把「猜」变成「测」 ---- */
+  // 分步探测：地址格式 → 跨域预检 → 真实请求状态码，逐级定位失败点
+  function diag(text, cls) {
+    var box = $("diagBox");
+    box.style.display = "block";
+    box.innerHTML += '<div class="diag-line' + (cls ? " " + cls : "") + '">' + text + "</div>";
+  }
+  function diagnose(base, key, model) {
+    var box = $("diagBox");
+    box.innerHTML = "";
+    box.style.display = "block";
+
+    var url = chatUrl(base);
+    diag("① 请求地址：<code>" + esc(url) + "</code>");
+
+    // 地址合法性
+    if (!/^https?:\/\//i.test(url)) {
+      diag("✗ 地址不完整，必须以 http:// 或 https:// 开头", "bad");
+      return;
+    }
+    if (location.protocol === "https:" && /^http:\/\//i.test(url)) {
+      diag("✗ 当前页面是 https，浏览器会拦截 http 请求（混合内容）。请改用 https 接口地址，或改用 Ollama 之外的服务商。", "bad");
+      return;
+    }
+    if (!/\/chat\/completions$/.test(url)) {
+      diag("⚠ 地址末尾不是 /chat/completions，已自动补全。若仍失败，检查是否漏了 /v1", "warn");
+    }
+    if (!key) { diag("✗ 未填 API Key", "bad"); return; }
+    if (!model) { diag("✗ 未填模型名称", "bad"); return; }
+
+    var t0 = Date.now();
+    diag("② 正在探测（跨域预检 + 真实请求）…");
+
+    var payload = JSON.stringify({
+      model: model,
+      messages: [{ role: "user", content: "说" }],
+      max_tokens: 1,
+      stream: false
+    });
+    var headers = {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + key
+    };
+
+    fetch(url, { method: "POST", headers: headers, body: payload })
+      .then(function (r) {
+        var ms = Date.now() - t0;
+        var code = r.status;
+        return r.text().then(function (t) {
+          var body = String(t).slice(0, 300);
+          if (code === 200) {
+            diag("③ HTTP 200 ✓ 连接成功，耗时 " + ms + "ms", "ok");
+            diag("模型可用，可以正常提问了。", "ok");
+            return;
+          }
+          diag("③ HTTP " + code + "（耗时 " + ms + "ms）", code >= 500 ? "warn" : "bad");
+          var msg = "";
+          try { msg = (JSON.parse(t).error || {}).message || ""; } catch (e) {}
+          var advice = {
+            401: "密钥无效或已过期 → 重新生成一个 API Key 粘贴进来",
+            402: "账户余额不足 → 去服务商后台充值（DeepSeek 新号常见）",
+            403: "密钥没有该模型的权限 → 换模型名或换 Key",
+            404: "接口地址或模型名不对 → 地址要以 /v1 结尾，模型名照抄服务商控制台",
+            422: "请求参数不被接受 → 多半是模型名填错",
+            429: "触发限流或并发超限 → 等一会儿再试"
+          }[code] || "服务端返回：" + esc(body);
+          diag("④ 判定：" + advice, "bad");
+          if (msg) diag("⑤ 原文：" + esc(msg.slice(0, 200)), "warn");
+        });
+      })
+      .catch(function (err) {
+        // 到这里说明 fetch 根本没拿到响应 —— 网络层被拦
+        diag("③ 请求未能送达（" + esc(String(err && err.message || err)) + "）", "bad");
+        diag("④ 判定：浏览器发出的请求被拦在到达服务商之前。已实测五家服务商跨域头均正常，所以基本不是跨域问题，按以下顺序排查：", "warn");
+        diag("1. 公司/家庭网络是否屏蔽了该域名（换个网络或用手机热点试）", "warn");
+        diag("2. 广告拦截、隐私保护类浏览器扩展是否拦截了请求（可无痕窗口试）", "warn");
+        diag("3. 地址是否填错（例如漏了 https:// 前缀、多了中文空格）", "warn");
+        diag("4. 若你是在 IDE 预览面板或本地 file:// 打开的，请改用系统浏览器访问线上地址", "warn");
+      });
+  }
+
+  $("btnTest").addEventListener("click", function () {
+    diagnose(
+      $("cfgBase").value.trim() || cfg.base,
+      $("cfgKey").value.trim() || cfg.key,
+      $("cfgModel").value.trim() || cfg.model
+    );
+  });
+
   $("btnClear").addEventListener("click", function () {
-    cfg = { base: "", key: "", model: "" };
+    cfg = { base: "", key: "", model: "", noStream: false };
     try { localStorage.removeItem(LS_KEY); } catch (e) {}
     $("cfgBase").value = ""; $("cfgKey").value = ""; $("cfgModel").value = "";
     setMode();

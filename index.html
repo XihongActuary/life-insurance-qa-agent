@@ -77,7 +77,8 @@
     <h3>大模型设置</h3>
     <p class="desc">填入任意 OpenAI 兼容接口即可启用。密钥只保存在你自己的浏览器里，不会上传。</p>
     <div class="notice">
-      静态页面无法隐藏密钥，请勿填入高额度或共享密钥。浏览器直连还受服务商 CORS 限制——若提示跨域失败，换一个支持浏览器直连的服务商即可。
+      静态页面无法隐藏密钥，请勿填入高额度或共享密钥。已实测 DeepSeek / 硅基流动 / 智谱 / Moonshot / 通义五家均支持浏览器直连（跨域头正常），
+      若调用失败，通常是<b>地址填写有误、密钥无效或余额不足、公司网络拦截</b>这三类原因——点「测试连接」可一键定位。
     </div>
     <div class="preset-row" id="presetRow"></div>
     <div class="field">
@@ -92,6 +93,12 @@
       <label for="cfgModel">模型名称</label>
       <input id="cfgModel" type="text" placeholder="deepseek-chat" autocomplete="off">
     </div>
+    <label class="check-line"><input type="checkbox" id="cfgNoStream"> 关闭流式输出（部分网关不支持 SSE，出错时可勾上）</label>
+    <div class="diag-row">
+      <button class="btn-ghost" id="btnTest">🔌 测试连接</button>
+      <span class="diag-hint">不改配置，只探测链路</span>
+    </div>
+    <div class="diag" id="diagBox" style="display:none"></div>
     <div class="modal-actions">
       <button class="btn-ghost" id="btnClear">清空密钥</button>
       <button class="btn-ghost" id="btnCancel">取消</button>

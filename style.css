@@ -329,6 +329,47 @@ footer .poem { font-family: var(--serif); color: var(--ink-2); margin-top: 10px;
   margin-bottom: 16px;
   line-height: 1.7;
 }
+.check-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--ink-2);
+  margin: -4px 0 12px;
+  cursor: pointer;
+}
+.check-line input { accent-color: var(--cinnabar); }
+.diag-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--line);
+}
+.diag-hint { font-size: 12px; color: var(--ink-3); }
+.diag {
+  max-height: 260px;
+  overflow-y: auto;
+  background: #faf8f2;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--ink-2);
+}
+.diag-line { margin-bottom: 3px; word-break: break-all; }
+.diag-line code {
+  background: #eeeae0;
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-size: 12px;
+}
+.diag-line.ok { color: var(--green); }
+.diag-line.warn { color: #8a6a12; }
+.diag-line.bad { color: var(--cinnabar); }
 .preset-row { display: flex; gap: 8px; flex-wrap: wrap; margin: -6px 0 14px; }
 .preset {
   font-size: 12px;
