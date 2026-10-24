@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>人身保险产品基础知识问答 Agent · 西红精算</title>
+<meta name="description" content="基于《人身保险产品基础知识问答手册》（保监寿险〔2008〕1640号）的问答助手，检索知识库原文并接入大模型作答。">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="brand"><span class="tomato">🍅</span> 西红精算</span>
+    <span class="brand-sub">人身保险产品基础知识问答 Agent</span>
+    <span class="topbar-spacer"></span>
+    <button class="icon-btn" id="btnSettings">⚙ 模型设置</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <section class="hero">
+    <h1>人身保险产品基础知识问答</h1>
+    <p class="lede">买保险之前，先来这里坐五分钟。先检索手册原文，再由大模型把话说成人话——<b>不卖焦虑、不推销、不讲术语</b>。</p>
+    <div class="meta-line">
+      <span class="tag" id="kbCount">知识库 77 条</span>
+      <span class="tag">依据：保监寿险〔2008〕1640号</span>
+      <span class="tag" id="modeTag">当前：本地检索模式</span>
+    </div>
+  </section>
+
+  <section class="ask-card">
+    <textarea id="q" placeholder="例如：定期寿险和终身寿险有什么区别？／分红险的红利是确定的吗？／犹豫期内退保怎么算？"></textarea>
+    <div class="ask-row">
+      <button class="btn-primary" id="btnAsk">提问</button>
+      <span class="hint">Enter 换行，Ctrl / ⌘ + Enter 发送</span>
+    </div>
+    <div class="chips" id="chips"></div>
+  </section>
+
+  <section class="answer-card" id="answerCard">
+    <div class="answer-head">
+      <span id="answerTitle">回答</span>
+      <span class="mode-badge" id="modeBadge">本地检索</span>
+    </div>
+    <div class="answer-body" id="answerBody"></div>
+    <div class="sources" id="sources" style="display:none">
+      <h5>参考条目（点击展开原文）</h5>
+      <div id="srcList"></div>
+    </div>
+  </section>
+
+  <section class="browse">
+    <h2>📖 知识库原文</h2>
+    <div class="sub" id="browseSub">共 77 条一问一答，点任一问题可直接提问</div>
+    <div class="cat-grid" id="catGrid"></div>
+    <div class="kb-list" id="kbList"></div>
+  </section>
+
+  <footer>
+    <div class="f-title">关于口径</div>
+    本页答案以《人身保险产品基础知识问答手册》（保监寿险〔2008〕1640号）原文为准，过时监管点已加「口径更新」标注。
+    真买保险、真出险理赔，一切以保险合同条款与现行监管规定为准；拿不准的，请拨打保险公司官方客服或监管热线核实。
+    本站不推荐、不比较任何具体公司和具体产品。
+    <div class="f-title" style="margin-top:14px">数据来源</div>
+    知识库原文：<a href="https://xihongactuary.github.io/product-actuary-kb-detailed/family.html" target="_blank" rel="noopener">保险产品精算AI助手 · 客户投保问答</a>
+    <div class="poem">风险可以被理解，安全感可以被计算。</div>
+    <div style="margin-top:10px">🍅 西红精算 · 用数据讲保险 · 用真心做科普</div>
+  </footer>
+
+</div>
+
+<!-- 模型设置 -->
+<div class="modal-mask" id="modalMask">
+  <div class="modal">
+    <h3>大模型设置</h3>
+    <p class="desc">填入任意 OpenAI 兼容接口即可启用。密钥只保存在你自己的浏览器里，不会上传。</p>
+    <div class="notice">
+      静态页面无法隐藏密钥，请勿填入高额度或共享密钥。浏览器直连还受服务商 CORS 限制——若提示跨域失败，换一个支持浏览器直连的服务商即可。
+    </div>
+    <div class="preset-row" id="presetRow"></div>
+    <div class="field">
+      <label for="cfgBase">接口地址（Base URL）</label>
+      <input id="cfgBase" type="text" placeholder="https://api.deepseek.com/v1" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="cfgKey">API Key</label>
+      <input id="cfgKey" type="password" placeholder="sk-..." autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="cfgModel">模型名称</label>
+      <input id="cfgModel" type="text" placeholder="deepseek-chat" autocomplete="off">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="btnClear">清空密钥</button>
+      <button class="btn-ghost" id="btnCancel">取消</button>
+      <button class="btn-primary" id="btnSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<script src="kb.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
